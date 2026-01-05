@@ -1,0 +1,82 @@
+import {
+  HeadContent,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router'
+import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+import { TanStackDevtools } from '@tanstack/react-devtools'
+import Header from '../components/Header'
+import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
+import appCss from '../styles.css?url'
+import type { QueryClient } from '@tanstack/react-query'
+import { ThemeProvider } from '@/components/theme-provider'
+import { getThemeServerFn } from '@/lib/theme'
+
+interface MyRouterContext {
+  queryClient: QueryClient
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'TanStack Start Starter' },
+    ],
+    links: [{ rel: 'stylesheet', href: appCss }],
+  }),
+  loader: async () => {
+    const theme = await getThemeServerFn()
+    return { theme }
+  },
+  shellComponent: RootDocument,
+})
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  const { theme } = Route.useLoaderData()
+
+  const themeScript = `
+    (function() {
+      var theme = ${JSON.stringify(theme)};
+      var root = document.documentElement;
+      
+      function applyTheme(t) {
+        var resolved = t;
+        if (t === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        root.classList.remove('light', 'dark');
+        root.classList.add(resolved);
+        root.style.colorScheme = resolved;
+      }
+      
+      applyTheme(theme);
+    })()
+  `
+
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        <ThemeProvider initialTheme={theme}>
+          <Header />
+          {children}
+          <TanStackDevtools
+            config={{ position: 'bottom-right' }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+              TanStackQueryDevtools,
+            ]}
+          />
+          <Scripts />
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
